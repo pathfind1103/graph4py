@@ -1,15 +1,31 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "graph4py"
 version = "0.1.0"
 description = "A Python library for graph operations and visualization"
-authors = [{ name = "Your Name", email = "your.email@example.com" }]
+authors = [{ name = "Kirill Kartashov", email = "DiskInserted@mgbay.com" }]
+readme = "README.md"
+requires-python = ">=3.8"
 dependencies = [
-    "pytest",
-    "networkx",
-    "matplotlib"
+    "numpy>=1.21.0",
+    "PyQt6>=6.4.0",
+    "pyqtgraph>=0.13.0",
+    "networkx>=3.0",
+    "matplotlib>=3.6.0",
+    "pytest>=7.0",
+    "pre-commit",
+    "pytest-cov>=4.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0",
+    "mypy>=1.0",
+    "flake8>=6.0",
+    "pytest-cov>=4.0"
 ]
 
 [tool.setuptools]
@@ -17,7 +33,7 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
-addopts = "-v"
+addopts = "-v --cov=src"
 
 [tool.black]
 line-length = 100
@@ -25,6 +41,11 @@ target-version = ["py38", "py39", "py310", "py311", "py312"]
 
 [tool.mypy]
 strict = true
+warn_return_any = true
+warn_unused_configs = true
 
 [tool.flake8]
 max-line-length = 100
+ignore = "E203, E266, E501, W503"
+max-complexity = 18
+select = "B,C,E,F,W,T4,B9"
