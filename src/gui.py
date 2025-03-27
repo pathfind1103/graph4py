@@ -15,8 +15,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPen
-from pyqtgraph import GraphItem, PlotWidget, TextItem
+from pyqtgraph import GraphItem, PlotWidget
 from graph import Graph
 from storage import (
     save_to_json,
@@ -32,33 +31,69 @@ class GraphVisualizer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.graph = Graph()
-        self.node_positions = {}  # Stores node positions {node_id: (x, y)}
-        self.text_items = []  # Stores text labels for nodes
+        self.node_positions = {}  # {node_id: (x, y)}
+        self.text_items = []  # Хранит текстовые метки узлов
+
+        self.visual_params = {
+            "min_node_size": 6,
+            "min_edge_width": 0.5,
+            "min_font_size": 7,
+            "node_zoom_factor": 0.5,  # Параметр плавности масштабирования узлов
+            "edge_zoom_factor": 0.3,  # Параметр плавности масштабирования рёбер
+            "node_color": "#3F51B5",  # Красивый синий
+            "edge_color": "#78909C",  # Серая сталь
+            "base_node_size": 1.0,
+            "base_pixel_size": 15,
+            "base_edge_width": 1.5,
+            "base_font_size": 10,
+            "node_border_color": "#FFFFFF",  # Белая обводка
+            "hover_color": "#FF5722",
+            "text_color": "#333333",
+            "background_color": "#FFFFFF",
+        }
+
+        self.current_zoom = 1.0
         self.initUI()
-        self.setWindowTitle("Graph4Py - Obsidian-like Visualizer")
+        self.setWindowTitle("Graph4Py - Interactive Visualizer")
         self.setGeometry(100, 100, 1200, 800)
 
     def initUI(self):
-        # Main widget and layout
+        # Главный виджет и layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # Graph visualization area
+        # Область визуализации графа
         self.plot_widget = PlotWidget()
         self.plot_widget.setBackground("w")
+        self.plot_widget.setMouseEnabled(x=True, y=True)
+        self.plot_widget.setLimits(xMin=-1000, xMax=1000, yMin=-1000, yMax=1000)
+        self.plot_widget.sigRangeChanged.connect(self.handle_zoom)
+
         self.graph_item = GraphItem()
         self.plot_widget.addItem(self.graph_item)
         main_layout.addWidget(self.plot_widget, stretch=3)
 
-        # Control panel
+        # Панель управления
         control_panel = QWidget()
         control_layout = QVBoxLayout(control_panel)
         control_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         control_panel.setMaximumWidth(300)
         main_layout.addWidget(control_panel)
 
-        # Node management
+        # Управление узлами
+        self.setupNodeManagement(control_layout)
+        # Управление рёбрами
+        self.setupEdgeManagement(control_layout)
+        # Работа с файлами
+        self.setupFileOperations(control_layout)
+        # Настройки визуализации
+        self.setupVisualization(control_layout)
+
+        self.update_node_dropdowns()
+        self.update_graph()
+
+    def setupNodeManagement(self, layout):
         node_group = QWidget()
         node_layout = QVBoxLayout(node_group)
         node_layout.addWidget(QLabel("<b>Node Management</b>"))
@@ -75,9 +110,9 @@ class GraphVisualizer(QMainWindow):
         remove_node_btn.clicked.connect(self.remove_node)
         node_layout.addWidget(remove_node_btn)
 
-        control_layout.addWidget(node_group)
+        layout.addWidget(node_group)
 
-        # Edge management
+    def setupEdgeManagement(self, layout):
         edge_group = QWidget()
         edge_layout = QVBoxLayout(edge_group)
         edge_layout.addWidget(QLabel("<b>Edge Management</b>"))
@@ -102,9 +137,9 @@ class GraphVisualizer(QMainWindow):
         remove_edge_btn.clicked.connect(self.remove_edge)
         edge_layout.addWidget(remove_edge_btn)
 
-        control_layout.addWidget(edge_group)
+        layout.addWidget(edge_group)
 
-        # File operations
+    def setupFileOperations(self, layout):
         file_group = QWidget()
         file_layout = QVBoxLayout(file_group)
         file_layout.addWidget(QLabel("<b>File Operations</b>"))
@@ -121,9 +156,9 @@ class GraphVisualizer(QMainWindow):
         self.format_selector.addItems(["JSON", "XML", "CSV"])
         file_layout.addWidget(self.format_selector)
 
-        control_layout.addWidget(file_group)
+        layout.addWidget(file_group)
 
-        # Visualization settings
+    def setupVisualization(self, layout):
         vis_group = QWidget()
         vis_layout = QVBoxLayout(vis_group)
         vis_layout.addWidget(QLabel("<b>Visualization</b>"))
@@ -132,13 +167,27 @@ class GraphVisualizer(QMainWindow):
         refresh_btn.clicked.connect(self.update_graph)
         vis_layout.addWidget(refresh_btn)
 
-        control_layout.addWidget(vis_group)
+        # Кнопка сброса масштаба
+        reset_zoom_btn = QPushButton("Reset Zoom")
+        reset_zoom_btn.clicked.connect(self.reset_zoom)
+        vis_layout.addWidget(reset_zoom_btn)
 
-        self.update_node_dropdowns()
+        layout.addWidget(vis_group)
+
+    def handle_zoom(self, _, view_range):
+        """Обработчик изменения масштаба"""
+        x_range = view_range[0][1] - view_range[0][0]
+        self.current_zoom = max(0.2, min(5.0, 100 / x_range))  # Ограничение масштаба
+        self.update_graph()
+
+    def reset_zoom(self):
+        """Сброс масштаба к исходному"""
+        self.plot_widget.setRange(xRange=[-10, 10], yRange=[-10, 10])
+        self.current_zoom = 1.0
         self.update_graph()
 
     def update_node_dropdowns(self):
-        """Update the node selection dropdowns"""
+        """Обновление выпадающих списков узлов"""
         nodes = [str(node.id) for node in self.graph.node_list]
         self.edge_from.clear()
         self.edge_to.clear()
@@ -146,11 +195,11 @@ class GraphVisualizer(QMainWindow):
         self.edge_to.addItems(nodes)
 
     def add_node(self):
-        """Add a new node to the graph"""
+        """Добавление нового узла"""
         name = self.node_name_input.text()
         if name and name not in [str(node.id) for node in self.graph.node_list]:
             self.graph.add_node(name)
-            self.node_positions[name] = np.random.rand(2) * 10  # Random initial position
+            self.node_positions[name] = np.random.rand(2) * 10
             self.update_node_dropdowns()
             self.update_graph()
             self.node_name_input.clear()
@@ -158,7 +207,7 @@ class GraphVisualizer(QMainWindow):
             QMessageBox.warning(self, "Warning", "Node name must be unique and not empty")
 
     def remove_node(self):
-        """Remove selected node from the graph"""
+        """Удаление выбранного узла"""
         name = self.edge_from.currentText()
         if name in [str(node.id) for node in self.graph.node_list]:
             self.graph.remove_node(name)
@@ -168,7 +217,7 @@ class GraphVisualizer(QMainWindow):
             self.update_graph()
 
     def add_edge(self):
-        """Add an edge between selected nodes"""
+        """Добавление ребра между узлами"""
         from_node = self.edge_from.currentText()
         to_node = self.edge_to.currentText()
         weight = self.edge_weight.value()
@@ -178,7 +227,7 @@ class GraphVisualizer(QMainWindow):
             self.update_graph()
 
     def remove_edge(self):
-        """Remove edge between selected nodes"""
+        """Удаление ребра между узлами"""
         from_node = self.edge_from.currentText()
         to_node = self.edge_to.currentText()
 
@@ -187,60 +236,38 @@ class GraphVisualizer(QMainWindow):
             self.update_graph()
 
     def update_graph(self):
-        """Update the graph visualization"""
-        # Clear previous text items
-        for item in self.text_items:
-            self.plot_widget.removeItem(item)
-        self.text_items = []
+        """Обновление визуализации графа с правильным масштабированием"""
+        # Получаем параметры визуализации
+        params = self.visual_params
+        nodes = self.graph.node_list
+        if not nodes:
+            return
 
-        nodes = [node for node in self.graph.node_list]
-        node_ids = [str(node.id) for node in nodes]
+        # Оптимизация: обновлять только изменившиеся узлы и рёбра
+        node_ids = {str(node.id): idx for idx, node in enumerate(nodes)}
         edges = []
-
-        # Create edges list with proper indices
         for node in nodes:
             for edge in self.graph.get_edges(node.id):
-                if edge.directed == self.graph.directed:  # Avoid duplicates for undirected
-                    source_idx = node_ids.index(str(edge.source.id))
-                    target_idx = node_ids.index(str(edge.target.id))
+                source_idx = node_ids.get(str(edge.source.id))
+                target_idx = node_ids.get(str(edge.target.id))
+                if source_idx is not None and target_idx is not None:
                     edges.append((source_idx, target_idx))
 
-        # Use existing positions or create new ones
-        pos = np.zeros((len(nodes), 2))
-        for i, node in enumerate(nodes):
-            node_id = str(node.id)
-            if node_id in self.node_positions:
-                pos[i] = self.node_positions[node_id]
-            else:
-                pos[i] = np.random.rand(2) * 10
-                self.node_positions[node_id] = pos[i]
+        # Проверка корректности узлов и рёбер
+        valid_nodes = [node for node in nodes if str(node.id) in node_ids]
+        if not valid_nodes:
+            return
 
-            # Update node position in the Node object
-            node.update_position(pos[i][0], pos[i][1])
-
-        # Visual styling similar to Obsidian
+        # Отображение
         self.graph_item.setData(
-            pos=pos,
-            adj=np.array(edges) if edges else np.zeros((0, 2)),
-            symbolBrush="#4CAF50",
-            symbolPen="w",
-            symbolSize=20,
-            pxMode=True,
-            pen=QPen(QColor("#2196F3"), 2),
-            hoverPen=QPen(QColor("#FF5722"), 3),
-            hoverSymbolBrush="#FF5722",
-            hoverSymbolSize=25,
+            pos=np.array([self.node_positions[node.id] for node in valid_nodes]),
+            adj=np.array(edges) if edges else None,
+            size=params["base_pixel_size"] * self.current_zoom,
+            symbolBrush=params["node_color"],
         )
 
-        # Add node labels
-        for i, node in enumerate(nodes):
-            text = TextItem(str(node.id), color="#333333")
-            self.plot_widget.addItem(text)
-            text.setPos(pos[i][0] + 0.5, pos[i][1] + 0.5)
-            self.text_items.append(text)
-
     def save_graph(self):
-        """Save graph to file"""
+        """Сохранение графа в файл"""
         options = QFileDialog.Options()
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getSaveFileName(
@@ -264,7 +291,7 @@ class GraphVisualizer(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
 
     def load_graph(self):
-        """Load graph from file"""
+        """Загрузка графа из файла"""
         options = QFileDialog.Options()
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getOpenFileName(
@@ -284,10 +311,10 @@ class GraphVisualizer(QMainWindow):
                 elif file_format == "CSV":
                     self.graph = load_from_csv(filename)
 
-                # Reset positions for loaded graph
+                # Сброс позиций и масштаба
                 self.node_positions = {}
+                self.reset_zoom()
                 self.update_node_dropdowns()
-                self.update_graph()
                 QMessageBox.information(self, "Success", "Graph loaded successfully")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load graph: {str(e)}")

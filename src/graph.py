@@ -41,11 +41,40 @@ class Graph:
             reverse_edge = edge.reverse()
             self.edges[target].append(reverse_edge)
 
+    def remove_node(self, node_id: Union[int, str]) -> None:
+        """Remove node and all connected edges"""
+        if node_id not in self.nodes:
+            return
+
+        node = self.nodes[node_id]
+
+        # Remove all edges connected to this node
+        del self.edges[node]
+        for edges_list in self.edges.values():
+            edges_list[:] = [e for e in edges_list if e.target.id != node_id]
+
+        # Remove the node itself
+        del self.nodes[node_id]
+
+    def remove_edge(self, source_id: Union[int, str], target_id: Union[int, str]) -> None:
+        """Remove edge between two nodes"""
+        if source_id not in self.nodes or target_id not in self.nodes:
+            return
+
+        source = self.nodes[source_id]
+        target = self.nodes[target_id]
+
+        # Remove edge in source -> target direction
+        self.edges[source] = [e for e in self.edges[source] if e.target.id != target_id]
+
+        # For undirected graphs, also remove target -> source edge
+        if not self.directed:
+            self.edges[target] = [e for e in self.edges[target] if e.target.id != source_id]
+
     def get_edges(self, node_id: Union[int, str]) -> List[Edge]:
-        """Получаем ребра для узла по его ID"""
-        node = self.nodes.get(node_id)
-        if node:
-            return self.edges.get(node, [])
+        """Get all edges for a node"""
+        if node_id in self.nodes:
+            return self.edges.get(self.nodes[node_id], [])
         return []
 
     def to_dict(self) -> Dict:
