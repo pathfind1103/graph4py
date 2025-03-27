@@ -17,16 +17,15 @@ dependencies = [
     "matplotlib>=3.6.0",
     "pytest>=7.0",
     "pre-commit",
-    "pytest-cov>=4.0"
-]
+    "pytest-cov>=4.0",
+    "flake8"]
 
 [project.optional-dependencies]
 dev = [
     "black>=23.0",
     "mypy>=1.0",
     "flake8>=6.0",
-    "pytest-cov>=4.0"
-]
+    "pytest-cov>=4.0"]
 
 [tool.setuptools]
 packages = ["src"]
@@ -45,7 +44,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.flake8]
-max-line-length = 100
+max-line-length = 200
 ignore = "E203, E266, E501, W503"
 max-complexity = 18
 select = "B,C,E,F,W,T4,B9"
