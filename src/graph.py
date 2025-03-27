@@ -2,7 +2,7 @@
 Graph module for creating and manipulating graphs.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 
 class Graph:
@@ -52,6 +52,17 @@ class Graph:
     def get_neighbors(self, node: int) -> List[Tuple[int, float]]:
         """Return a list of neighbors for a given node."""
         return self.adj_list.get(node, [])
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert graph to a dictionary format."""
+        return {"directed": self.directed, "adj_list": self.adj_list}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Graph":
+        """Create a Graph instance from a dictionary."""
+        graph = cls(directed=data["directed"])
+        graph.adj_list = {int(k): v for k, v in data["adj_list"].items()}
+        return graph
 
     def __repr__(self) -> str:
         """String representation of the graph."""
