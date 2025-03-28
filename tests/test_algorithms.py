@@ -1,4 +1,5 @@
 import sys
+import pytest
 
 from graph import Graph
 from algorithms.bfs import bfs
@@ -8,16 +9,42 @@ from algorithms.astar import a_star
 from six import StringIO
 
 
-def test_bfs(capsys):
-    g = Graph()
+def test_bfs_directed():
+    g = Graph(directed=True)
     g.add_edge(1, 2)
     g.add_edge(1, 3)
     g.add_edge(2, 4)
-    g.add_edge(3, 5)
+
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
 
     bfs(g, 1)
-    captured = capsys.readouterr()
-    assert captured.out.strip() == "1 2 3 4 5"
+    output = sys.stdout.getvalue().strip()
+    sys.stdout = old_stdout
+
+    assert output == "1 2 3 4"
+
+
+def test_bfs_undirected():
+    g = Graph(directed=False)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+    g.add_edge(3, 4)
+
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+
+    bfs(g, 1)
+    output = sys.stdout.getvalue().strip()
+    sys.stdout = old_stdout
+
+    assert output == "1 2 3 4"
+
+
+def test_bfs_invalid_node():
+    g = Graph()
+    with pytest.raises(ValueError):
+        bfs(g, 99)
 
 
 def test_dfs_directed():
