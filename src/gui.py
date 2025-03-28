@@ -267,39 +267,34 @@ class GraphVisualizer(QMainWindow):
         )
 
     def save_graph(self):
-        """Сохранение графа в файл"""
-        options = QFileDialog.Options()
+        """Сохранение графа в файл."""
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getSaveFileName(
             self,
             f"Save Graph As {file_format}",
             "",
             f"{file_format} Files (*.{file_format.lower()})",
-            options=options,
         )
 
-        if filename:
-            try:
-                if file_format == "JSON":
-                    save_to_json(self.graph, filename)
-                elif file_format == "XML":
-                    save_to_xml(self.graph, filename)
-                elif file_format == "CSV":
-                    save_to_csv(self.graph, filename)
-                QMessageBox.information(self, "Success", "Graph saved successfully")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
+        if not filename:  # Если пользователь отменил сохранение
+            return
+
+        try:
+            if file_format == "JSON":
+                save_to_json(self.graph, filename)
+            elif file_format == "XML":
+                save_to_xml(self.graph, filename)
+            elif file_format == "CSV":
+                save_to_csv(self.graph, filename)
+            QMessageBox.information(self, "Success", "Graph saved successfully")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
 
     def load_graph(self):
         """Загрузка графа из файла"""
-        options = QFileDialog.Options()
         file_format = self.format_selector.currentText()
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            f"Load {file_format} Graph",
-            "",
-            f"{file_format} Files (*.{file_format.lower()})",
-            options=options,
+        filename, _ = QFileDialog.getOpenFileName(  # Убрать options=
+            self, f"Load {file_format} Graph", "", f"{file_format} Files (*.{file_format.lower()})"
         )
 
         if filename:

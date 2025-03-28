@@ -18,7 +18,9 @@ dependencies = [
     "pytest>=7.0",
     "pre-commit",
     "pytest-cov>=4.0",
-    "flake8"]
+    "flake8",
+    "pytest-mock>=3.14.0",
+    "pytest-qt>=4.4.0"]
 
 [project.optional-dependencies]
 dev = [
