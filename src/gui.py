@@ -1,3 +1,4 @@
+import json
 import sys
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -17,14 +18,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from pyqtgraph import GraphItem, PlotWidget
 from graph import Graph
-from storage import (
-    save_to_json,
-    load_from_json,
-    save_to_xml,
-    load_from_xml,
-    save_to_csv,
-    load_from_csv,
-)
 
 
 class GraphVisualizer(QMainWindow):
@@ -267,52 +260,82 @@ class GraphVisualizer(QMainWindow):
         )
 
     def save_graph(self):
-        """Сохранение графа в файл"""
-        options = QFileDialog.Options()
+        """Сохранение графа в файл."""
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getSaveFileName(
             self,
             f"Save Graph As {file_format}",
             "",
             f"{file_format} Files (*.{file_format.lower()})",
-            options=options,
         )
 
-        if filename:
-            try:
-                if file_format == "JSON":
-                    save_to_json(self.graph, filename)
-                elif file_format == "XML":
-                    save_to_xml(self.graph, filename)
-                elif file_format == "CSV":
-                    save_to_csv(self.graph, filename)
-                QMessageBox.information(self, "Success", "Graph saved successfully")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
+        if not filename:
+            return
+
+        try:
+            # Сохраняем граф и позиции отдельно
+            graph_data = {
+                "graph": self.graph.to_dict(),
+                "node_positions": {str(k): v for k, v in self.node_positions.items()},
+            }
+
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(graph_data, f, indent=4)
+
+            QMessageBox.information(self, "Success", "Graph saved successfully")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
 
     def load_graph(self):
         """Загрузка графа из файла"""
-        options = QFileDialog.Options()
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getOpenFileName(
-            self,
-            f"Load {file_format} Graph",
-            "",
-            f"{file_format} Files (*.{file_format.lower()})",
-            options=options,
+            self, f"Load {file_format} Graph", "", f"{file_format} Files (*.{file_format.lower()})"
         )
 
         if filename:
             try:
-                if file_format == "JSON":
-                    self.graph = load_from_json(filename)
-                elif file_format == "XML":
-                    self.graph = load_from_xml(filename)
-                elif file_format == "CSV":
-                    self.graph = load_from_csv(filename)
+                with open(filename, "r", encoding="utf-8") as f:
+                    data = json.load(f)
 
-                # Сброс позиций и масштаба
-                self.node_positions = {}
+                # Создаем новый граф
+                self.graph = Graph(directed=data["graph"]["directed"])
+
+                # Добавляем узлы
+                for node_id, node_data in data["graph"]["nodes"].items():
+                    self.graph.add_node(node_id, node_data)
+
+                # Добавляем рёбра, избегая дублирования для ненаправленного графа
+                added_edges = set()
+                for edge_data in data["graph"]["edges"]:
+                    source = edge_data["source"]
+                    target = edge_data["target"]
+
+                    # Для ненаправленного графа сохраняем только одно ребро
+                    if not self.graph.directed:
+                        edge_key = tuple(sorted((source, target)))
+                        if edge_key in added_edges:
+                            continue
+                        added_edges.add(edge_key)
+
+                    self.graph.add_edge(
+                        source,
+                        target,
+                        edge_data.get("weight", 1.0),
+                        edge_data.get("data", {}),
+                    )
+
+                # Восстанавливаем позиции
+                self.node_positions = {
+                    k: tuple(v) if isinstance(v, list) else v
+                    for k, v in data.get("node_positions", {}).items()
+                }
+
+                # Для новых узлов без позиций создаем случайные
+                for node in self.graph.node_list:
+                    if str(node.id) not in self.node_positions:
+                        self.node_positions[str(node.id)] = np.random.rand(2) * 10
+
                 self.reset_zoom()
                 self.update_node_dropdowns()
                 QMessageBox.information(self, "Success", "Graph loaded successfully")

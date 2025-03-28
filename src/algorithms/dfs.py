@@ -1,18 +1,24 @@
-def dfs(graph, start_node: int) -> None:
+from typing import Set, Union
+from graph import Graph
+
+
+def dfs(graph: Graph, start_node: Union[int, str]) -> None:
     """
     Perform Depth-First Search (DFS) starting from the given node.
 
-    :param graph: The graph instance.
-    :param start_node: The node where DFS should start.
+    :param graph: The graph instance
+    :param start_node: The node ID where DFS should start (can be int or str)
     """
-    visited = set()
+    visited: Set[Union[int, str]] = set()
     _dfs_helper(graph, start_node, visited)
 
 
-def _dfs_helper(graph, node: int, visited: set) -> None:
+def _dfs_helper(graph: Graph, node_id: Union[int, str], visited: Set[Union[int, str]]) -> None:
     """Helper method for DFS traversal."""
-    if node not in visited:
-        print(node, end=" ")
-        visited.add(node)
-        for neighbor, _ in graph.get_neighbors(node):
-            _dfs_helper(graph, neighbor, visited)
+    if node_id not in visited:
+        print(node_id, end=" ")
+        visited.add(node_id)
+
+        # Get all edges from current node
+        for edge in graph.get_edges(node_id):
+            _dfs_helper(graph, edge.target.id, visited)
