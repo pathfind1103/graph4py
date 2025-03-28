@@ -1,8 +1,11 @@
+import sys
+
 from graph import Graph
 from algorithms.bfs import bfs
 from algorithms.dfs import dfs
 from algorithms.dijkstra import dijkstra
 from algorithms.astar import a_star
+from six import StringIO
 
 
 def test_bfs(capsys):
@@ -17,16 +20,39 @@ def test_bfs(capsys):
     assert captured.out.strip() == "1 2 3 4 5"
 
 
-def test_dfs(capsys):
-    g = Graph()
+def test_dfs_directed():
+    g = Graph(directed=True)
     g.add_edge(1, 2)
     g.add_edge(1, 3)
     g.add_edge(2, 4)
-    g.add_edge(3, 5)
+
+    # Захватываем вывод print
+    from io import StringIO
+    import sys
+
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
 
     dfs(g, 1)
-    captured = capsys.readouterr()
-    assert captured.out.strip() in ["1 2 4 3 5", "1 3 5 2 4"]
+    output = sys.stdout.getvalue().strip()
+    sys.stdout = old_stdout
+
+    assert output == "1 2 4 3"
+
+
+def test_dfs_undirected():
+    g = Graph(directed=False)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+
+    dfs(g, 1)
+    output = sys.stdout.getvalue().strip()
+    sys.stdout = old_stdout
+
+    assert output == "1 2 3"
 
 
 def test_dijkstra():
