@@ -82,15 +82,29 @@ def test_dfs_undirected():
     assert output == "1 2 3"
 
 
-def test_dijkstra():
-    g = Graph()
-    g.add_edge(1, 2, 2)
-    g.add_edge(1, 3, 4)
-    g.add_edge(2, 3, 1)
-    g.add_edge(2, 4, 7)
+def test_dijkstra_basic():
+    g = Graph(directed=True)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(2, 3, 2.0)
+    g.add_edge(1, 3, 4.0)
 
     distances = dijkstra(g, 1)
-    assert distances == {1: 0, 2: 2, 3: 3, 4: 9}
+    assert distances == {1: 0, 2: 1.0, 3: 3.0}
+
+
+def test_dijkstra_unreachable():
+    g = Graph(directed=True)
+    g.add_edge(1, 2, 1.0)
+    g.add_node(3)
+
+    distances = dijkstra(g, 1)
+    assert distances[3] == float("inf")
+
+
+def test_dijkstra_invalid_start():
+    g = Graph()
+    with pytest.raises(ValueError):
+        dijkstra(g, 99)
 
 
 def test_a_star_basic():
