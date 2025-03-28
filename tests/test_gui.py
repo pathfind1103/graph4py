@@ -136,10 +136,12 @@ def test_save_load_graph(qtbot, app, tmp_path, mocker):
     # Проверяем содержимое файла
     with open(test_file, "r") as f:
         data = json.load(f)
-        assert "A" in data["nodes"]
-        assert "B" in data["nodes"]
-        assert data["edges"][0]["source"] == "A"
-        assert data["edges"][0]["target"] == "B"
+        assert "A" in data["graph"]["nodes"]
+        assert "B" in data["graph"]["nodes"]
+        assert data["graph"]["edges"][0]["source"] == "A"
+        assert data["graph"]["edges"][0]["target"] == "B"
+        assert data["node_positions"]["A"] == [1.0, 2.0]
+        assert data["node_positions"]["B"] == [3.0, 4.0]
 
     # 2. Тестируем загрузку
     new_app = GraphVisualizer()
@@ -162,9 +164,17 @@ def test_save_load_graph(qtbot, app, tmp_path, mocker):
     assert len(new_app.graph.node_list) == 2
     assert "A" in [node.id for node in new_app.graph.node_list]
     assert "B" in [node.id for node in new_app.graph.node_list]
-    assert new_app.node_positions["A"] == [1.0, 2.0]
-    assert new_app.node_positions["B"] == [3.0, 4.0]
-    assert len(new_app.graph.get_edges("A")) == 1
+    assert tuple(new_app.node_positions["A"]) == (1.0, 2.0)
+    assert tuple(new_app.node_positions["B"]) == (3.0, 4.0)
+
+    # Проверяем количество рёбер с учетом направленности графа
+    if new_app.graph.directed:
+        assert len(new_app.graph.get_edges("A")) == 1
+    else:
+        # Для ненаправленного графа должно быть одно ребро (A-B или B-A)
+        edges = new_app.graph.get_edges("A")
+        assert len(edges) == 1
+        assert edges[0].target.id == "B" or edges[0].source.id == "B"
 
     # Закрываем второе окно
     new_app.close()
