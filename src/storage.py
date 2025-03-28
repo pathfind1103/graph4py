@@ -1,11 +1,11 @@
-"""
-Storage module for saving and loading graphs in JSON, XML, and CSV formats.
-"""
-
 import json
 import xml.etree.ElementTree as ET
 import csv
 from graph import Graph
+
+"""
+Storage module for saving and loading graphs in JSON, XML, and CSV formats.
+"""
 
 
 def save_to_json(graph: Graph, filename: str) -> None:
@@ -18,24 +18,28 @@ def load_from_json(filename: str) -> Graph:
     """Load a graph from a JSON file."""
     with open(filename, "r", encoding="utf-8") as f:
         data = json.load(f)
-
-    # Преобразуем строки обратно в числа
-    graph = Graph(directed=data["directed"])
-    graph.adj_list = {
-        int(node): [(neighbor, weight) for neighbor, weight in edges]
-        for node, edges in data["adj_list"].items()
-    }
-
-    return graph
+    return Graph.from_dict(data)
 
 
 def save_to_xml(graph: Graph, filename: str) -> None:
     """Save the graph to an XML file."""
     root = ET.Element("graph", directed=str(graph.directed).lower())
-    for node, edges in graph.adj_list.items():
-        node_elem = ET.SubElement(root, "node", id=str(node))
-        for neighbor, weight in edges:
-            ET.SubElement(node_elem, "edge", target=str(neighbor), weight=str(weight))
+
+    nodes_elem = ET.SubElement(root, "nodes")
+    for node in graph.node_list:
+        ET.SubElement(nodes_elem, "node", id=str(node.id))
+
+    edges_elem = ET.SubElement(root, "edges")
+    for edges in graph.edges.values():
+        for edge in edges:
+            if edge.directed == graph.directed:
+                ET.SubElement(
+                    edges_elem,
+                    "edge",
+                    source=str(edge.source.id),
+                    target=str(edge.target.id),
+                    weight=str(edge.weight),
+                )
 
     tree = ET.ElementTree(root)
     tree.write(filename, encoding="utf-8", xml_declaration=True)
@@ -45,16 +49,23 @@ def load_from_xml(filename: str) -> Graph:
     """Load a graph from an XML file."""
     tree = ET.parse(filename)
     root = tree.getroot()
+
     directed = root.get("directed", "false").lower() == "true"
     graph = Graph(directed=directed)
 
-    for node_elem in root.findall("node"):
-        node = int(node_elem.get("id"))
-        graph.add_node(node)
-        for edge_elem in node_elem.findall("edge"):
-            neighbor = int(edge_elem.get("target"))
-            weight = float(edge_elem.get("weight"))
-            graph.add_edge(node, neighbor, weight)
+    nodes_elem = root.find("nodes")
+    if nodes_elem is not None:
+        for node_elem in nodes_elem.findall("node"):
+            node_id = node_elem.get("id")
+            graph.add_node(node_id)
+
+    edges_elem = root.find("edges")
+    if edges_elem is not None:
+        for edge_elem in edges_elem.findall("edge"):
+            source = edge_elem.get("source")
+            target = edge_elem.get("target")
+            weight = float(edge_elem.get("weight", 1.0))
+            graph.add_edge(source, target, weight)
 
     return graph
 
@@ -63,10 +74,20 @@ def save_to_csv(graph: Graph, filename: str) -> None:
     """Save the graph to a CSV file."""
     with open(filename, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["node1", "node2", "weight"])
-        for node, edges in graph.adj_list.items():
-            for neighbor, weight in edges:
-                writer.writerow([node, neighbor, weight])
+        writer.writerow(["source", "target", "weight"])
+
+        saved_edges = set()
+        for edges in graph.edges.values():
+            for edge in edges:
+                if edge.directed == graph.directed:
+                    edge_key = (
+                        (edge.source.id, edge.target.id)
+                        if graph.directed
+                        else tuple(sorted((edge.source.id, edge.target.id)))
+                    )
+                    if edge_key not in saved_edges:
+                        writer.writerow([edge.source.id, edge.target.id, edge.weight])
+                        saved_edges.add(edge_key)
 
 
 def load_from_csv(filename: str, directed: bool = False) -> Graph:
@@ -74,8 +95,31 @@ def load_from_csv(filename: str, directed: bool = False) -> Graph:
     graph = Graph(directed=directed)
     with open(filename, "r", newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
-        next(reader)  # Skip header
+
         for row in reader:
-            node1, node2, weight = int(row[0]), int(row[1]), float(row[2])
-            graph.add_edge(node1, node2, weight)
+            if len(row) < 3:
+                continue
+
+            try:
+                source, target = int(row[0]), int(row[1])
+                weight = float(row[2])
+                graph.add_node(source)
+                graph.add_node(target)
+                graph.add_edge(source, target, weight)
+                break
+            except (ValueError, IndexError):
+                continue
+
+        for row in reader:
+            if len(row) < 3:
+                continue
+            try:
+                source, target = int(row[0]), int(row[1])
+                weight = float(row[2])
+                graph.add_node(source)
+                graph.add_node(target)
+                graph.add_edge(source, target, weight)
+            except (ValueError, IndexError):
+                continue
+
     return graph
