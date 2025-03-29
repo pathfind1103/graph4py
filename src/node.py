@@ -31,4 +31,5 @@ class Node:
 
     def update_position(self, x: float, y: float):
         """Update node position for visualization"""
+        # х
         self.position = (x, y)
