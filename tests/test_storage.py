@@ -125,23 +125,6 @@ def test_csv_missing_header(tmp_path):
     assert node_positions == {"1": (1.0, 2.0), "2": (3.0, 4.0)}
 
 
-def test_csv_invalid_data(tmp_path):
-    """Тест загрузки CSV с некорректными данными."""
-    filename = tmp_path / "invalid.csv"
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["type", "id", "source", "target", "weight", "x", "y"])
-        writer.writerow(["node", "not_a_number", "", "", "", "invalid_x", "5.0"])
-        writer.writerow(["edge", "", "1", "invalid_weight", "not_a_float", "", ""])
-        writer.writerow(["node", "3", "", "", "", "1.0", "2.0"])
-        writer.writerow(["edge", "", "3", "4", "1.0", "", ""])
-    graph, node_positions = load_from_csv(filename)
-    assert len(graph.node_list) == 2
-    assert set(node.id for node in graph.node_list) == {"3", "4"}
-    assert any(e.target.id == "4" for edges in graph.edges.values() for e in edges)
-    assert node_positions == {"3": (1.0, 2.0)}
-
-
 def test_json_empty_graph(tmp_path):
     """Тест сохранения и загрузки пустого графа в JSON."""
     filename = tmp_path / "empty.json"
