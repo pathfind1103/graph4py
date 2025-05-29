@@ -260,7 +260,6 @@ class GraphVisualizer(QMainWindow):
         )
 
     def save_graph(self):
-        """Сохранение графа в файл."""
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getSaveFileName(
             self,
@@ -268,13 +267,10 @@ class GraphVisualizer(QMainWindow):
             "",
             f"{file_format} Files (*.{file_format.lower()})",
         )
-
         if not filename:
             return
-
         try:
             if file_format == "JSON":
-                # Сохраняем граф и позиции отдельно, конвертируя NumPy массивы в списки
                 graph_data = {
                     "graph": self.graph.to_dict(),
                     "node_positions": {
@@ -282,86 +278,69 @@ class GraphVisualizer(QMainWindow):
                         for k, v in self.node_positions.items()
                     },
                 }
-
                 with open(filename, "w", encoding="utf-8") as f:
                     json.dump(graph_data, f, indent=4)
             else:
-                # Сохранение в XML и CSV остается без изменений
                 from storage import save_to_xml, save_to_csv
 
                 if file_format == "XML":
-                    save_to_xml(self.graph, filename)
+                    save_to_xml(self.graph, filename, node_positions=self.node_positions)
                 elif file_format == "CSV":
-                    save_to_csv(self.graph, filename)
-
+                    save_to_csv(self.graph, filename, node_positions=self.node_positions)
             QMessageBox.information(self, "Success", "Graph saved successfully")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
 
     def load_graph(self):
-        """Загрузка графа из файла"""
         file_format = self.format_selector.currentText()
         filename, _ = QFileDialog.getOpenFileName(
             self, f"Load {file_format} Graph", "", f"{file_format} Files (*.{file_format.lower()})"
         )
-
         if filename:
             try:
                 if file_format == "JSON":
                     with open(filename, "r", encoding="utf-8") as f:
                         data = json.load(f)
-
-                    # Создаем новый граф
                     self.graph = Graph(directed=data["graph"]["directed"])
-
-                    # Добавляем узлы
                     for node_id, node_data in data["graph"]["nodes"].items():
                         self.graph.add_node(node_id, node_data)
-
-                    # Добавляем рёбра, избегая дублирования для ненаправленного графа
                     added_edges = set()
                     for edge_data in data["graph"]["edges"]:
                         source = edge_data["source"]
                         target = edge_data["target"]
-
-                        # Для ненаправленного графа сохраняем только одно ребро
                         if not self.graph.directed:
                             edge_key = tuple(sorted((source, target)))
                             if edge_key in added_edges:
                                 continue
                             added_edges.add(edge_key)
-
                         self.graph.add_edge(
                             source,
                             target,
                             edge_data.get("weight", 1.0),
                             edge_data.get("data", {}),
                         )
-
-                    # Восстанавливаем позиции
                     self.node_positions = {
-                        k: tuple(v) if isinstance(v, list) else v
+                        k: (
+                            tuple(v)
+                            if isinstance(v, list)
+                            and len(v) == 2
+                            and all(isinstance(x, (int, float)) for x in v)
+                            else np.random.rand(2) * 10
+                        )
                         for k, v in data.get("node_positions", {}).items()
                     }
-
-                    # Для новых узлов без позиций создаем случайные
-                    for node in self.graph.node_list:
-                        if str(node.id) not in self.node_positions:
-                            self.node_positions[str(node.id)] = np.random.rand(2) * 10
                 else:
-                    # Загрузка из XML и CSV
                     from storage import load_from_xml, load_from_csv
 
                     if file_format == "XML":
-                        self.graph = load_from_xml(filename)
+                        self.graph, self.node_positions = load_from_xml(filename)
                     elif file_format == "CSV":
-                        self.graph = load_from_csv(filename, directed=self.graph.directed)
-
-                    # Сбрасываем позиции для XML/CSV
-                    self.node_positions = {
-                        str(node.id): np.random.rand(2) * 10 for node in self.graph.node_list
-                    }
-
+                        self.graph, self.node_positions = load_from_csv(
+                            filename, directed=self.graph.directed
+                        )
+                for node in self.graph.node_list:
+                    if str(node.id) not in self.node_positions:
+                        self.node_positions[str(node.id)] = np.random.rand(2) * 10
                 self.reset_zoom()
                 self.update_node_dropdowns()
                 self.update_graph()

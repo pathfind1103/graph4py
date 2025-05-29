@@ -21,13 +21,18 @@ def load_from_json(filename: str) -> Graph:
     return Graph.from_dict(data)
 
 
-def save_to_xml(graph: Graph, filename: str) -> None:
-    """Save the graph to an XML file."""
+def save_to_xml(graph: Graph, filename: str, node_positions: dict = None) -> None:
+    """Save the graph to an XML file, including node positions if provided."""
     root = ET.Element("graph", directed=str(graph.directed).lower())
 
     nodes_elem = ET.SubElement(root, "nodes")
     for node in graph.node_list:
-        ET.SubElement(nodes_elem, "node", id=str(node.id))
+        node_attrs = {"id": str(node.id)}
+        if node_positions and str(node.id) in node_positions:
+            pos = node_positions[str(node.id)]
+            node_attrs["x"] = str(pos[0])
+            node_attrs["y"] = str(pos[1])
+        ET.SubElement(nodes_elem, "node", **node_attrs)
 
     edges_elem = ET.SubElement(root, "edges")
     for edges in graph.edges.values():
@@ -45,19 +50,27 @@ def save_to_xml(graph: Graph, filename: str) -> None:
     tree.write(filename, encoding="utf-8", xml_declaration=True)
 
 
-def load_from_xml(filename: str) -> Graph:
-    """Load a graph from an XML file."""
+def load_from_xml(filename: str) -> tuple[Graph, dict]:
+    """Load a graph and node positions from an XML file."""
     tree = ET.parse(filename)
     root = tree.getroot()
 
     directed = root.get("directed", "false").lower() == "true"
     graph = Graph(directed=directed)
+    node_positions = {}
 
     nodes_elem = root.find("nodes")
     if nodes_elem is not None:
         for node_elem in nodes_elem.findall("node"):
             node_id = node_elem.get("id")
             graph.add_node(node_id)
+            x = node_elem.get("x")
+            y = node_elem.get("y")
+            if x is not None and y is not None:
+                try:
+                    node_positions[node_id] = (float(x), float(y))
+                except ValueError:
+                    pass  # Игнорируем некорректные позиции
 
     edges_elem = root.find("edges")
     if edges_elem is not None:
@@ -67,14 +80,18 @@ def load_from_xml(filename: str) -> Graph:
             weight = float(edge_elem.get("weight", 1.0))
             graph.add_edge(source, target, weight)
 
-    return graph
+    return graph, node_positions
 
 
-def save_to_csv(graph: Graph, filename: str) -> None:
-    """Save the graph to a CSV file."""
+def save_to_csv(graph: Graph, filename: str, node_positions: dict = None) -> None:
+    """Save the graph to a CSV file, including node positions if provided."""
     with open(filename, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["source", "target", "weight"])
+        writer.writerow(["type", "id", "source", "target", "weight", "x", "y"])
+
+        if node_positions:
+            for node_id, pos in node_positions.items():
+                writer.writerow(["node", node_id, "", "", "", pos[0], pos[1]])
 
         saved_edges = set()
         for edges in graph.edges.values():
@@ -86,40 +103,36 @@ def save_to_csv(graph: Graph, filename: str) -> None:
                         else tuple(sorted((edge.source.id, edge.target.id)))
                     )
                     if edge_key not in saved_edges:
-                        writer.writerow([edge.source.id, edge.target.id, edge.weight])
+                        writer.writerow(
+                            ["edge", "", edge.source.id, edge.target.id, edge.weight, "", ""]
+                        )
                         saved_edges.add(edge_key)
 
 
-def load_from_csv(filename: str, directed: bool = False) -> Graph:
-    """Load a graph from a CSV file."""
+def load_from_csv(filename: str, directed: bool = False) -> tuple[Graph, dict]:
+    """Load a graph and node positions from a CSV file."""
     graph = Graph(directed=directed)
+    node_positions = {}
+
     with open(filename, "r", newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
 
         for row in reader:
-            if len(row) < 3:
+            if len(row) < 7:
                 continue
-
             try:
-                source, target = int(row[0]), int(row[1])
-                weight = float(row[2])
-                graph.add_node(source)
-                graph.add_node(target)
-                graph.add_edge(source, target, weight)
-                break
+                record_type = row[0]
+                if record_type == "node":
+                    node_id, x, y = row[1], row[5], row[6]
+                    graph.add_node(node_id)
+                    if x and y:
+                        node_positions[node_id] = (float(x), float(y))
+                elif record_type == "edge":
+                    source, target, weight = row[2], row[3], float(row[4])
+                    graph.add_node(source)
+                    graph.add_node(target)
+                    graph.add_edge(source, target, weight)
             except (ValueError, IndexError):
                 continue
 
-        for row in reader:
-            if len(row) < 3:
-                continue
-            try:
-                source, target = int(row[0]), int(row[1])
-                weight = float(row[2])
-                graph.add_node(source)
-                graph.add_node(target)
-                graph.add_edge(source, target, weight)
-            except (ValueError, IndexError):
-                continue
-
-    return graph
+    return graph, node_positions
